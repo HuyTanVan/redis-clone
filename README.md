@@ -181,5 +181,5 @@ aof
 
 ## Related
 
-- [Redis Protocol Spec]([https://redis.io/docs/reference/protocol-spec/](https://redis.io/docs/latest/develop/reference/protocol-spec/))
-- [Build Your Own Redis — CodeCrafters]([https://app.codecrafters.io/courses/redis](https://www.build-redis-from-scratch.dev/en/aof))
+- [Redis Protocol Spec]([https://redis.io/docs/latest/develop/reference/protocol-spec/])
+- [Build Your Own Redis — CodeCrafters]([https://www.build-redis-from-scratch.dev/en/aof])
