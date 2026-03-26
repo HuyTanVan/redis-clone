@@ -23,34 +23,10 @@ Redis is one of the most widely used tools in system design — caching, pub/sub
 
 ---
 
-## Architecture
+## Request Flow
 
 <!-- Add your workflow diagram here -->
 ![Request Flow](docs/request-flow.png)
-
-**Request flow:**
-
-```
-redis-cli
-  ↓ TCP connection
-server.go       — accepts connections, spawns goroutine per client
-  ↓
-handler.go      — coordinates read → dispatch → write per command
-  ↓
-resp/reader.go  — parses raw bytes into Value structs (RESP protocol)
-  ↓
-command/dispatcher.go  — routes command name to handler function
-  ↓
-command/string.go      — executes SET / GET / DEL / HSET / HGET etc.
-  ↓
-store/store.go         — in-memory map, protected by RWMutex
-  ↓ (on write)
-persistence/aof.go     — appends command to disk for durability
-  ↑
-resp/writer.go  — marshals Value back to RESP bytes
-  ↑
-handler.go → conn.Write() → client receives response
-```
 
 **On restart:** AOF replays every write command top-to-bottom to rebuild RAM state.
 
