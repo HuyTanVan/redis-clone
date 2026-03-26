@@ -14,19 +14,19 @@ Redis is one of the most widely used tools in system design — caching, pub/sub
 
 ## Key Features
  
-- **RESP protocol** — parses and serializes Redis wire protocol from scratch, no libraries
-- **Concurrent connections** — goroutine per client with mutex-protected shared storage
-- **In-memory store** — `RWMutex`-backed key-value and hash storage for safe concurrent access
-- **TTL expiry** — keys expire automatically via background cleanup goroutine
-- **AOF persistence** — write commands appended to disk, replayed on restart to restore state
-- **Command dispatcher** — extensible routing table mapping command names to handlers
+- **RESP protocol** — parses and serializes Redis wire protocol.
+- **Concurrent connections** — goroutine per client with mutex-protected shared storage.
+- **In-memory store** — `RWMutex`-backed key-value and hash storage for safe concurrent access.
+- **TTL expiry** — expired keys are automatically cleaned up by implementing background goroutine.
+- **AOF persistence** — write commands are saved to disk and replayed on restart, safely restoring data if the server crashes.
+- **Command dispatcher** — route command names to correct handlers using hash-map.
 
 ---
 
 ## Architecture
 
 <!-- Add your workflow diagram here -->
-> _Diagram coming soon — hand-drawn flow between components_
+![Request Flow](docs/request-flow.png)
 
 **Request flow:**
 
