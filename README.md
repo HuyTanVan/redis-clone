@@ -1,2 +1,198 @@
 # redis-clone
-A Redis-compatible server built from scratch in Go. Implements RESP wire protocol, concurrent client handling, TTL expiry, and AOF persistence — no libraries, no shortcuts.
+
+A Redis-compatible in-memory storage server built from scratch in Go.
+
+> Built as part of my [System Design Series](#) to understand how Redis works under the hood.
+
+---
+
+## Why I Built This
+
+Redis is one of the most widely used tools in system design — caching, pub/sub, leaderboards — but it's often treated as a black box. This project is my attempt to open that box: implement the wire protocol, the storage layer, persistence, and expiry from scratch, and understand every tradeoff along the way.
+
+---
+
+## Architecture
+
+<!-- Add your workflow diagram here -->
+> _Diagram coming soon — hand-drawn flow between components_
+
+**Request flow:**
+
+```
+redis-cli
+  ↓ TCP connection
+server.go       — accepts connections, spawns goroutine per client
+  ↓
+handler.go      — coordinates read → dispatch → write per command
+  ↓
+resp/reader.go  — parses raw bytes into Value structs (RESP protocol)
+  ↓
+command/dispatcher.go  — routes command name to handler function
+  ↓
+command/string.go      — executes SET / GET / DEL / HSET / HGET etc.
+  ↓
+store/store.go         — in-memory map, protected by RWMutex
+  ↓ (on write)
+persistence/aof.go     — appends command to disk for durability
+  ↑
+resp/writer.go  — marshals Value back to RESP bytes
+  ↑
+handler.go → conn.Write() → client receives response
+```
+
+**On restart:** AOF replays every write command top-to-bottom to rebuild RAM state.
+
+---
+
+## Project Structure
+
+```
+redis/
+├── main.go
+├── server/
+│   ├── server.go       # TCP listener, accept loop, goroutine per connection
+│   └── handler.go      # Reads command → dispatches → writes response
+├── resp/
+│   ├── types.go        # Value struct and RESP type constants
+│   ├── reader.go       # Parses RESP protocol bytes into Value
+│   └── writer.go       # Marshals Value back into RESP bytes
+├── store/
+│   ├── store.go        # In-memory key-value map with RWMutex
+│   └── ttl.go          # Expiry tracking and background cleanup
+├── command/
+│   ├── dispatcher.go   # Maps command names to handler functions
+│   ├── string.go       # SET, GET, DEL, PING, HSET, HGET
+│   └── ttl.go          # EXPIRE, TTL
+└── persistence/
+    └── aof.go          # Append-only file: write on SET/HSET, replay on start
+```
+
+---
+
+## RESP Protocol
+
+Redis clients communicate using **RESP (Redis Serialization Protocol)** — a plain-text, line-based protocol over TCP.
+
+| Type    | Prefix | Example |
+|---------|--------|---------|
+| Simple string | `+` | `+OK\r\n` |
+| Error   | `-`    | `-ERR unknown command\r\n` |
+| Integer | `:`    | `:42\r\n` |
+| Bulk string | `$` | `$3\r\nfoo\r\n` |
+| Array   | `*`    | `*2\r\n$3\r\nGET\r\n$3\r\nfoo\r\n` |
+| Null    | `$-1`  | `$-1\r\n` |
+
+When you type `GET foo` in redis-cli, it actually sends:
+```
+*2\r\n$3\r\nGET\r\n$3\r\nfoo\r\n
+```
+
+This server parses that wire format, executes the command, and responds in the same protocol.
+
+---
+
+## Supported Commands
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `PING` | `PING [message]` | Returns PONG or echoes message |
+| `SET` | `SET key value` | Store a string value |
+| `GET` | `GET key` | Retrieve a value, nil if missing |
+| `DEL` | `DEL key` | Delete a key |
+| `HSET` | `HSET hash field value` | Set a field in a hash |
+| `HGET` | `HGET hash field` | Get a field from a hash |
+| `EXPIRE` | `EXPIRE key seconds` | Set a TTL on a key |
+| `TTL` | `TTL key` | Get remaining TTL (-1 = no expiry, -2 = expired) |
+
+---
+
+## How to Run
+
+**Prerequisites:** Go 1.21+
+
+```bash
+# Clone the repo
+git clone https://github.com/yourname/redis-clone
+cd redis-clone
+
+# Initialize module (first time only)
+go mod init github.com/yourname/redis-clone
+
+# Run the server
+go run main.go
+# → Listening on :6379
+```
+
+**Test with redis-cli:**
+```bash
+redis-cli set foo bar     # OK
+redis-cli get foo         # bar
+redis-cli expire foo 10   # 1
+redis-cli ttl foo         # 9
+redis-cli hset user name huy  # OK
+redis-cli hget user name      # huy
+```
+
+**Test with netcat (no redis-cli needed):**
+```bash
+echo -e "*1\r\n\$4\r\nPING\r\n" | nc localhost 6379
+# → +PONG
+```
+
+**AOF persistence:**
+
+Write commands are automatically appended to `database.aof`. On restart, the file replays to restore state:
+```bash
+redis-cli set foo bar
+# stop and restart the server
+redis-cli get foo   # still returns bar
+```
+
+---
+
+## Concurrency Model
+
+- One goroutine per client connection — no blocking between clients
+- `sync.RWMutex` on the store — concurrent reads, exclusive writes
+- Separate background goroutines for TTL cleanup and AOF sync
+
+```
+acceptLoop
+  ├── goroutine → client 1 (handleConn loop)
+  ├── goroutine → client 2 (handleConn loop)
+  └── goroutine → client 3 (handleConn loop)
+
+store (shared, mutex-protected)
+  └── goroutine → TTL cleanup every 1s
+
+aof
+  └── goroutine → fsync every 1s
+```
+
+---
+
+## What I Learned
+
+- How RESP wire protocol works at the byte level
+- Why Redis uses `RWMutex` instead of `Mutex` (concurrent reads don't block each other)
+- How AOF persistence works — write to RAM first, then disk, replay on restart
+- The tradeoff between `appendfsync always` vs `everysec` vs `no`
+- How connection pooling abstracts thousands of user requests into tens of Redis connections
+
+---
+
+## What's Next
+
+- [ ] LRU eviction (`store/lru.go`)
+- [ ] AOF rewrite / compaction (`persistence/rewrite.go`)
+- [ ] `SETEX`, `PERSIST`, `EXISTS`, `KEYS`
+- [ ] List commands: `LPUSH`, `LPOP`, `LRANGE`
+- [ ] Pub/Sub
+
+---
+
+## Related
+
+- [Redis Protocol Spec](https://redis.io/docs/reference/protocol-spec/)
+- [Build Your Own Redis — CodeCrafters](https://app.codecrafters.io/courses/redis)
