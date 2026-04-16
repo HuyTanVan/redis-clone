@@ -8,7 +8,7 @@ A Redis-compatible in-memory storage server built from scratch in Go.
 
 ## Why I Built This
 
-Redis is one of the most widely used tools in system design — caching, pub/sub, leaderboards — but it's often treated as a black box. This project is my attempt to open that box: implement the wire protocol, the storage layer, persistence, and expiry from scratch, and understand every tradeoff along the way.
+Redis is one of the most widely used tools in system design — caching, pub/sub, leaderboards — but it's often treated as a black box. This project is my attempt to open that box: implement the wire protocol, the storage layer, persistence, expiry and LRU eviction policy from scratch, and understand every tradeoff along the way.
 
 ---
 
@@ -18,6 +18,7 @@ Redis is one of the most widely used tools in system design — caching, pub/sub
 - **Concurrent connections** — goroutine per client with mutex-protected shared storage.
 - **In-memory store** — `RWMutex`-backed key-value and hash storage for safe concurrent access.
 - **TTL expiry** — expired keys are automatically cleaned up by implementing background goroutine.
+- **LRU eviction policy** — evicts Least Recently Used keys when memory exceeds configured capacity, preventing OOM(Out-of-memory) crashes.
 - **AOF persistence** — write commands are saved to disk and replayed on restart, safely restoring data if the server crashes.
 - **Command dispatcher** — route command names to correct handlers using hash-map.
 
@@ -28,7 +29,7 @@ Redis is one of the most widely used tools in system design — caching, pub/sub
 <!-- Add your workflow diagram here -->
 ![Request Flow](docs/request-flow.png)
 
-**On restart:** AOF replays every write command top-to-bottom to rebuild RAM state.
+**On restart:** AOF replays every write(SET/DELETE) command top-to-bottom to rebuild RAM state.
 
 ---
 
@@ -45,14 +46,16 @@ redis/
 │   ├── reader.go       # Parses RESP protocol bytes into Value
 │   └── writer.go       # Marshals Value back into RESP bytes
 ├── store/
+    ├── lru.go          # Least Recently Used Policy
 │   ├── store.go        # In-memory key-value map with RWMutex
 │   └── ttl.go          # Expiry tracking and background cleanup
 ├── command/
 │   ├── dispatcher.go   # Maps command names to handler functions
-│   ├── string.go       # SET, GET, DEL, PING, HSET, HGET
+│   ├── hash.go         # HSET, HGET, HDEL, HGETALL, HLEN, HEXISTS
+│   ├── string.go       # SET, GET, DEL, PING
 │   └── ttl.go          # EXPIRE, TTL
 └── persistence/
-    └── aof.go          # Append-only file: write on SET/HSET, replay on start
+    └── aof.go          # Append-only file: write on SET/DEL/HSET/HDEL, replay on start
 ```
 
 ---
@@ -89,8 +92,9 @@ This server parses that wire format, executes the command, and responds in the s
 | `DEL` | `DEL key` | Delete a key |
 | `HSET` | `HSET hash field value` | Set a field in a hash |
 | `HGET` | `HGET hash field` | Get a field from a hash |
+| `HGETALL` | `HGETALL key` | Get all fields and values from a hash |
 | `EXPIRE` | `EXPIRE key seconds` | Set a TTL on a key |
-| `TTL` | `TTL key` | Get remaining TTL (-1 = no expiry, -2 = expired) |
+| `TTL` | `TTL key` | Get remaining TTL (-1 = key exists, but no expiry set, -2 = key doesn't exists) |
 
 ---
 
@@ -163,16 +167,14 @@ aof
 
 - How RESP wire protocol works at the byte level
 - Why Redis uses `RWMutex` instead of `Mutex` (concurrent reads don't block each other)
+- How TTL, and LRU work behind the scene
 - How AOF persistence works — write to RAM first, then disk, replay on restart
 - The tradeoff between `appendfsync always` vs `everysec` vs `no`
-- How connection pooling abstracts thousands of user requests into tens of Redis connections
-
+- ...
 ---
 
 ## What's Next
 
-- [ ] LRU eviction (`store/lru.go`)
-- [ ] AOF rewrite / compaction (`persistence/rewrite.go`)
 - [ ] `SETEX`, `PERSIST`, `EXISTS`, `KEYS`
 - [ ] List commands: `LPUSH`, `LPOP`, `LRANGE`
 - [ ] Pub/Sub
@@ -180,6 +182,6 @@ aof
 ---
 
 ## Related
-
+- [Redis Commands](https://redis.io/docs/latest/commands/)
 - [Redis Protocol Spec](https://redis.io/docs/latest/develop/reference/protocol-spec/)
 - [Build Your Own Redis — CodeCrafters](https://www.build-redis-from-scratch.dev/en/aof)
