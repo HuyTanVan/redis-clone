@@ -104,18 +104,18 @@ This server parses that wire format, executes the command, and responds in the s
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourname/redis-clone
+git clone https://github.com/HuyTanVan/redis-clone
 cd redis-clone
 
 # Initialize module (first time only)
-go mod init github.com/yourname/redis-clone
+go mod init github.com/HuyTanVan/redis-clone
 
 # Run the server
 go run main.go
 # → Listening on :6379
 ```
 
-**Test with redis-cli:**
+**Test with redis-cli(Download at: https://redis.io/docs/latest/develop/tools/cli/):**
 ```bash
 redis-cli set foo bar     # OK
 redis-cli get foo         # bar
