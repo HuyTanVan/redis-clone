@@ -2,9 +2,9 @@ package server
 
 import (
 	"fmt"
-	"my-redis/command"
-	"my-redis/persistence"
-	"my-redis/store"
+	"redis-clone/command"
+	"redis-clone/persistence"
+	"redis-clone/store"
 	"net"
 )
 

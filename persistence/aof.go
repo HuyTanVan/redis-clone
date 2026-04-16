@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"my-redis/resp"
 	"os"
+	"redis-clone/resp"
 	"sync"
 	"time"
 )
@@ -47,7 +47,7 @@ func (aof *Aof) Write(value resp.Value) error {
 	aof.mu.Lock()
 	defer aof.mu.Unlock()
 	fmt.Println("value written", value.Marshal())
-	_, err := aof.file.Write(value.Marshal())
+	_, err := aof.file.Write(value.Marshal()) // writes to OS memory (page cache), not disk.
 	if err != nil {
 		return err
 	}

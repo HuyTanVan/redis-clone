@@ -2,7 +2,7 @@ package main
 
 import (
 	"log"
-	"my-redis/server"
+	"redis-clone/server"
 )
 
 func main() {

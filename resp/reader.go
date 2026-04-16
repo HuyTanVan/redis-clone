@@ -125,6 +125,8 @@ func (v Value) Marshal() []byte {
 		return v.marshalArray()
 	case "bulk":
 		return v.marshalBulk()
+	case "integer":
+		return v.marshalInteger() // integer is represented as bulk string in RESP
 	case "string":
 		return v.marshalString()
 	case "null":
@@ -132,6 +134,8 @@ func (v Value) Marshal() []byte {
 	case "error":
 		return v.marshallError()
 	default:
+		// return empty byte array for unknown type, should not happen
+		// if Writer writes this back to client, client will be hanging until timeout because it waits for CRLF that never comes
 		return []byte{}
 	}
 }
@@ -183,4 +187,11 @@ func (v Value) marshallError() []byte {
 
 func (v Value) marshallNull() []byte {
 	return []byte("$-1\r\n")
+}
+func (v Value) marshalInteger() []byte {
+	var bytes []byte
+	bytes = append(bytes, INTEGER)
+	bytes = append(bytes, strconv.Itoa(v.Num)...)
+	bytes = append(bytes, '\r', '\n')
+	return bytes
 }

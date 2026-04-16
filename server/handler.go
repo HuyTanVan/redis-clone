@@ -2,8 +2,8 @@ package server
 
 import (
 	"fmt"
-	"my-redis/command"
-	"my-redis/resp"
+	"redis-clone/command"
+	"redis-clone/resp"
 	"net"
 )
 

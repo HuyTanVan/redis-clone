@@ -1,9 +1,9 @@
 package command
 
 import (
-	"my-redis/persistence"
-	"my-redis/resp"
-	"my-redis/store"
+	"redis-clone/persistence"
+	"redis-clone/resp"
+	"redis-clone/store"
 	"strings"
 )
 
@@ -27,10 +27,21 @@ func NewDispatcher(s *store.Store, aof *persistence.Aof) *Dispatcher {
 }
 
 func (d *Dispatcher) registerHandlers() {
-	d.handlers["SET"] = d.set
-	d.handlers["GET"] = d.get
-	d.handlers["DEL"] = d.del
-	d.handlers["PING"] = d.ping
+	// core commands
+	d.handlers["PING"] = d.ping     // OK
+	d.handlers["SET"] = d.set       // OK
+	d.handlers["GET"] = d.get       // OK
+	d.handlers["DEL"] = d.del       // OK
+	d.handlers["EXPIRE"] = d.expire // OK
+	d.handlers["TTL"] = d.ttl       // OK
+
+	// Hash commands
+	d.handlers["HSET"] = d.hset       // OK
+	d.handlers["HGET"] = d.hget       // OK
+	d.handlers["HDEL"] = d.hdel       // OK
+	d.handlers["HGETALL"] = d.hgetall // OK
+	d.handlers["HEXISTS"] = d.hexists // OK
+	d.handlers["HLEN"] = d.hlen       // OK
 }
 
 func (d *Dispatcher) Dispatch(v resp.Value) resp.Value {
